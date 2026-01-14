@@ -1,4 +1,5 @@
 import { NavLink } from "react-router-dom";
+import logoUrl from "../assets/logo-ngipak.svg";
 
 export default function Navbar() {
   const base =
@@ -9,10 +10,20 @@ export default function Navbar() {
     <header className="sticky top-0 z-50 border-b border-white/10 bg-brand-800">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="h-10 w-10 rounded-2xl bg-white/15 ring-1 ring-white/20" />
+          {/* Logo */}
+          <div className="grid h-11 w-11 place-items-center ">
+            <img
+              src={logoUrl}
+              alt="Logo Ngipak Berdaya"
+              className="h-10 w-10 object-contain"
+            />
+          </div>
+
           <div className="min-w-0 leading-tight text-white">
             <div className="truncate font-semibold">Ngipak Berdaya</div>
-            <div className="truncate text-xs text-white/80">Produk UMKM & Kesehatan</div>
+            <div className="truncate text-xs text-white/80">
+              Informasi UMKM & Kesehatan
+            </div>
           </div>
         </div>
 
@@ -23,7 +34,6 @@ export default function Navbar() {
               `${base} ${isActive ? active : "text-white"}`
             }
           >
-            {/* mobile: singkat, desktop: lengkap */}
             <span className="sm:hidden">UMKM</span>
             <span className="hidden sm:inline">Informasi UMKM</span>
           </NavLink>
