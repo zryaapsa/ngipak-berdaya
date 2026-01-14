@@ -23,19 +23,19 @@ export const KADER: Kader[] = [
     id: "k1",
     dusun: { id: "d1", nama: "Kalangan 1", slug: "kalangan-1" },
     nama: "Bu Siti",
-    no_wa: "6281111111111",
+    no_wa: "6287819443263",
   },
   {
     id: "k2",
     dusun: { id: "d3", nama: "Ngipak", slug: "ngipak" },
     nama: "Bu Wati",
-    no_wa: "6282222222222",
+    no_wa: "628976536276",
   },
   {
     id: "k3",
     dusun: { id: "d8", nama: "Jetis", slug: "jetis" },
     nama: "Bu Rina",
-    no_wa: "6283333333333",
+    no_wa: "6285641191935",
   },
 ];
 
