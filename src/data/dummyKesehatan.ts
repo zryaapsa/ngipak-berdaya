@@ -1,4 +1,4 @@
-import type { Dusun } from "./dummy";
+import type { Dusun } from "./dummyUmkm";
 
 export type Kader = {
   id: string;
@@ -17,6 +17,92 @@ export type JadwalKesehatan = {
   lokasi?: string;
   catatan?: string;
 };
+
+export type IsuKesehatan = {
+  id: string;
+  judul: string;
+  ringkas: string;
+  dampak: string[];
+  upayaDesa: string[];
+  aksiWarga: string[];
+};
+
+export type StatistikBulanan = {
+  bulan: string; // "YYYY-MM"
+  hipertensi: number;
+  stunting: number;
+};
+
+export const META_KESEHATAN = {
+  periode_terakhir: "2026-01",
+  sumber: "Rekap Posyandu Desa Ngipak (dummy)",
+};
+
+export const LEAFLET = {
+  kesehatan: {
+    label: "Leaflet Kesehatan (Stunting)",
+    path: "/leaflet/leaflet-kesehatan.pdf",
+  },
+};
+
+export const ISU: IsuKesehatan[] = [
+  {
+    id: "stunting",
+    judul: "Stunting",
+    ringkas:
+      "Fokus 1000 HPK: pemantauan tumbuh kembang, edukasi gizi keluarga, dan dukungan PMT.",
+    dampak: [
+      "Pertumbuhan balita terhambat",
+      "Risiko kesehatan jangka panjang meningkat",
+    ],
+    upayaDesa: [
+      "Penimbangan dan pengukuran rutin",
+      "PMT balita dan edukasi gizi",
+    ],
+    aksiWarga: [
+      "Datang posyandu tiap bulan (BB/TB tercatat)",
+      "Cukupi protein hewani sesuai kemampuan",
+      "Lengkapi imunisasi dan vitamin",
+    ],
+  },
+  {
+    id: "hipertensi",
+    judul: "Hipertensi",
+    ringkas:
+      "Kasus tekanan darah tinggi perlu pemantauan rutin, pola makan seimbang, dan aktivitas fisik.",
+    dampak: [
+      "Meningkatkan risiko stroke dan penyakit jantung",
+      "Keluhan pusing/lemas berulang terutama pada lansia",
+    ],
+    upayaDesa: [
+      "Cek tensi berkala di posbindu/posyandu lansia",
+      "Edukasi diet rendah garam dan berhenti merokok",
+    ],
+    aksiWarga: [
+      "Cek tekanan darah minimal 1x/bulan",
+      "Kurangi garam, gorengan, dan rokok",
+      "Aktivitas fisik ringan 30 menit/hari",
+    ],
+  },
+  {
+    id: "kesehatan-lingkungan",
+    judul: "Kesehatan Lingkungan",
+    ringkas:
+      "Kebersihan lingkungan dan pengelolaan air/sampah untuk menurunkan diare/DBD/penyakit kulit.",
+    dampak: ["Diare pada balita", "DBD saat musim hujan"],
+    upayaDesa: ["PSN 3M", "Edukasi cuci tangan", "Kerja bakti lingkungan"],
+    aksiWarga: ["Tutup wadah air", "Buang sampah terpilah", "Cuci tangan pakai sabun"],
+  },
+];
+
+export const STATISTIK: StatistikBulanan[] = [
+  { bulan: "2025-08", hipertensi: 110, stunting: 18 },
+  { bulan: "2025-09", hipertensi: 115, stunting: 17 },
+  { bulan: "2025-10", hipertensi: 121, stunting: 16 },
+  { bulan: "2025-11", hipertensi: 124, stunting: 15 },
+  { bulan: "2025-12", hipertensi: 126, stunting: 15 },
+  { bulan: "2026-01", hipertensi: 128, stunting: 14 },
+];
 
 export const KADER: Kader[] = [
   {

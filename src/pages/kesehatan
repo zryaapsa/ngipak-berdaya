@@ -1,0 +1,472 @@
+import { useMemo, useState } from "react";
+
+import { DUSUN } from "../data/dummyUmkm";
+import {
+  JADWAL,
+  KADER,
+  ISU,
+  STATISTIK,
+  META_KESEHATAN,
+  LEAFLET,
+  type IsuKesehatan,
+} from "../data/dummyKesehatan";
+import { formatTanggalID } from "../lib/date";
+import { toWaLink } from "../lib/wa";
+
+import Card from "../components/ui/Card";
+import Badge from "../components/ui/Badge";
+import Button from "../components/ui/Button";
+import SearchInput from "../components/ui/SearchInput";
+import FilterSelect from "../components/ui/FilterSelect";
+import Modal from "../components/ui/Modal";
+
+function compareTanggalAsc(a: string, b: string) {
+  if (a < b) return -1;
+  if (a > b) return 1;
+  return 0;
+}
+
+function formatBulanID(ym: string) {
+  const [y, m] = ym.split("-");
+  const map: Record<string, string> = {
+    "01": "Jan",
+    "02": "Feb",
+    "03": "Mar",
+    "04": "Apr",
+    "05": "Mei",
+    "06": "Jun",
+    "07": "Jul",
+    "08": "Agu",
+    "09": "Sep",
+    "10": "Okt",
+    "11": "Nov",
+    "12": "Des",
+  };
+  return `${map[m] ?? m} ${y}`;
+}
+
+function Sparkline({
+  values,
+  height = 64,
+}: {
+  values: number[];
+  height?: number;
+}) {
+  const w = 260;
+  const h = height;
+  const pad = 8;
+
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = Math.max(1, max - min);
+
+  const xStep = (w - pad * 2) / Math.max(1, values.length - 1);
+
+  const pts = values.map((v, i) => {
+    const x = pad + i * xStep;
+    const y = pad + (h - pad * 2) * (1 - (v - min) / span);
+    return { x, y };
+  });
+
+  const line = pts.map((p) => `${p.x},${p.y}`).join(" ");
+  const area = `${pad},${h - pad} ${line} ${w - pad},${h - pad}`;
+
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className="w-full">
+      <polyline
+        points={area}
+        fill="currentColor"
+        fillOpacity="0.10"
+        stroke="none"
+      />
+      <polyline
+        points={line}
+        fill="none"
+        stroke="currentColor"
+        strokeOpacity="0.9"
+        strokeWidth="3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {pts.map((p, i) => (
+        <circle key={i} cx={p.x} cy={p.y} r="3.2" fill="currentColor" />
+      ))}
+    </svg>
+  );
+}
+
+function StatCard({
+  title,
+  value,
+  unit,
+  series,
+  hint,
+}: {
+  title: string;
+  value: number;
+  unit?: string;
+  series: { label: string; value: number }[];
+  hint?: string;
+}) {
+  return (
+    <Card className="p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-sm text-gray-600">{title}</div>
+          <div className="mt-1 text-3xl font-semibold text-gray-900">
+            {value}
+            {unit ? (
+              <span className="text-base font-medium text-gray-500"> {unit}</span>
+            ) : null}
+          </div>
+          <div className="mt-1 text-xs text-gray-500">
+            Periode: {formatBulanID(META_KESEHATAN.periode_terakhir)}
+            {hint ? <span className="text-gray-400"> • {hint}</span> : null}
+          </div>
+        </div>
+        <Badge className="hidden sm:inline-flex">Trend</Badge>
+      </div>
+
+      <div className="mt-3 text-brand-900">
+        <Sparkline values={series.map((s) => s.value)} />
+        <div className="mt-1 flex justify-between text-[11px] text-gray-500">
+          <span>{series[0]?.label}</span>
+          <span>{series[series.length - 1]?.label}</span>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function IsuIcon({ id }: { id: string }) {
+  // ikon ringan (inline) supaya tidak tergantung library
+  if (id === "stunting") {
+    return (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 3v18M6 7h12M7 21h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+    );
+  }
+  if (id === "hipertensi") {
+    return (
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M12 21s-7-4.5-7-10a4 4 0 0 1 7-2 4 4 0 0 1 7 2c0 5.5-7 10-7 10Z"
+          stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+      </svg>
+    );
+  }
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path d="M12 2l4 8H8l4-8Z" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+      <path d="M4 22h16" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+export default function KesehatanPage() {
+  const [dusunId, setDusunId] = useState<string>("all");
+  const [q, setQ] = useState("");
+  const [selectedIsu, setSelectedIsu] = useState<IsuKesehatan | null>(null);
+
+  const dusunOptions = useMemo(() => {
+    return [
+      { value: "all", label: "Semua Dusun" },
+      ...DUSUN.map((d) => ({ value: d.id, label: d.nama })),
+    ];
+  }, []);
+
+  const filteredJadwal = useMemo(() => {
+    const query = q.trim().toLowerCase();
+
+    return [...JADWAL]
+      .filter((j) => (dusunId === "all" ? true : j.dusun.id === dusunId))
+      .filter((j) => {
+        if (!query) return true;
+        const hay = `${j.kegiatan} ${j.dusun.nama} ${j.lokasi ?? ""}`.toLowerCase();
+        return hay.includes(query);
+      })
+      .sort((a, b) => compareTanggalAsc(a.tanggal, b.tanggal));
+  }, [dusunId, q]);
+
+  const upcomingTop3 = useMemo(() => filteredJadwal.slice(0, 3), [filteredJadwal]);
+
+  const kaderFiltered = useMemo(() => {
+    return KADER.filter((k) => (dusunId === "all" ? true : k.dusun.id === dusunId));
+  }, [dusunId]);
+
+  const hipertensiSeries = useMemo(
+    () => STATISTIK.map((s) => ({ label: formatBulanID(s.bulan), value: s.hipertensi })),
+    [],
+  );
+  const stuntingSeries = useMemo(
+    () => STATISTIK.map((s) => ({ label: formatBulanID(s.bulan), value: s.stunting })),
+    [],
+  );
+  const last = STATISTIK[STATISTIK.length - 1];
+
+  const reset = () => {
+    setDusunId("all");
+    setQ("");
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* HERO */}
+      <div className="rounded-2xl bg-gradient-to-br from-brand-800 to-brand-900 p-6 text-white shadow-soft">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold">Informasi Kesehatan</h1>
+            <p className="mt-1 text-white/80">
+              Ringkasan isu kesehatan desa, tren angka, jadwal layanan, dan unduh leaflet.
+            </p>
+            <div className="mt-2 text-xs text-white/70">Sumber: {META_KESEHATAN.sumber}</div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Badge className="bg-white/15 text-white ring-1 ring-white/20">
+              {filteredJadwal.length} jadwal
+            </Badge>
+            <Button variant="secondary" onClick={reset}>
+              Reset
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* DASHBOARD TOP */}
+      <div className="grid gap-4 lg:grid-cols-3">
+        <div className="grid gap-4 lg:col-span-2 md:grid-cols-2">
+          <StatCard
+            title="Penderita hipertensi"
+            value={last?.hipertensi ?? 0}
+            unit="orang"
+            series={hipertensiSeries}
+            hint="6 bulan terakhir"
+          />
+          <StatCard
+            title="Kasus stunting"
+            value={last?.stunting ?? 0}
+            unit="anak"
+            series={stuntingSeries}
+            hint="6 bulan terakhir"
+          />
+        </div>
+
+        {/* Download leaflet */}
+        <Card className="p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-sm font-semibold text-gray-900">Leaflet Edukasi</div>
+              <div className="mt-1 text-sm text-gray-600">
+                Unduh materi edukasi untuk dibagikan ke warga.
+              </div>
+            </div>
+            <Badge>PDF</Badge>
+          </div>
+
+          <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
+            <div className="text-xs font-semibold text-gray-600">Tersedia</div>
+            <div className="mt-1 font-semibold text-gray-900">{LEAFLET.kesehatan.label}</div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <a href={LEAFLET.kesehatan.path} download>
+                <Button>Unduh PDF</Button>
+              </a>
+              <a href={LEAFLET.kesehatan.path} target="_blank" rel="noreferrer">
+                <Button variant="secondary">Preview</Button>
+              </a>
+            </div>
+            <div className="mt-2 text-xs text-gray-500">
+              Lokasi file: public/leaflet/leaflet-kesehatan.pdf
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* ISU */}
+      <Card className="p-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-900">Isu Kesehatan di Desa Ngipak</h2>
+          <Badge>{ISU.length} isu</Badge>
+        </div>
+
+        <div className="mt-4 grid gap-3 md:grid-cols-3">
+          {ISU.map((isu) => (
+            <button
+              key={isu.id}
+              type="button"
+              onClick={() => setSelectedIsu(isu)}
+              className="rounded-2xl border border-gray-200 p-4 text-left hover:bg-gray-50"
+            >
+              <div className="flex items-start gap-3">
+                <div className="rounded-xl bg-brand-50 p-2 text-brand-900 ring-1 ring-brand-100">
+                  <IsuIcon id={isu.id} />
+                </div>
+                <div className="min-w-0">
+                  <div className="font-semibold text-gray-900">{isu.judul}</div>
+                  <div className="mt-1 text-sm text-gray-600">{isu.ringkas}</div>
+                  <div className="mt-2 text-xs text-brand-900">Lihat detail →</div>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </Card>
+
+      <Modal
+        open={!!selectedIsu}
+        onClose={() => setSelectedIsu(null)}
+        title={selectedIsu?.judul}
+      >
+        {selectedIsu ? (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-700">{selectedIsu.ringkas}</p>
+
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-xl border border-gray-200 p-3">
+                <div className="text-xs font-semibold text-gray-600">Dampak</div>
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-700">
+                  {selectedIsu.dampak.map((x, i) => <li key={i}>{x}</li>)}
+                </ul>
+              </div>
+
+              <div className="rounded-xl border border-gray-200 p-3">
+                <div className="text-xs font-semibold text-gray-600">Upaya desa</div>
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-700">
+                  {selectedIsu.upayaDesa.map((x, i) => <li key={i}>{x}</li>)}
+                </ul>
+              </div>
+
+              <div className="rounded-xl border border-gray-200 p-3">
+                <div className="text-xs font-semibold text-gray-600">Aksi warga</div>
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-700">
+                  {selectedIsu.aksiWarga.map((x, i) => <li key={i}>{x}</li>)}
+                </ul>
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-gray-200 bg-gray-50 p-3">
+              <div className="text-xs font-semibold text-gray-600">Dokumen edukasi</div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <a href={LEAFLET.kesehatan.path} download>
+                  <Button>Unduh Leaflet</Button>
+                </a>
+                <a href={LEAFLET.kesehatan.path} target="_blank" rel="noreferrer">
+                  <Button variant="secondary">Preview</Button>
+                </a>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
+
+      {/* FILTER PANEL */}
+      <Card className="p-4">
+        <div className="grid gap-3 md:grid-cols-3">
+          <FilterSelect
+            label="Dusun"
+            value={dusunId}
+            options={dusunOptions}
+            onChange={setDusunId}
+            icon={
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <path d="M3 5h18M6 12h12M10 19h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            }
+          />
+
+          <SearchInput
+            className="md:col-span-2"
+            label="Cari jadwal"
+            placeholder="Cari kegiatan / lokasi..."
+            value={q}
+            onChange={setQ}
+          />
+        </div>
+      </Card>
+
+      {/* UPCOMING */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-900">Jadwal Terdekat</h2>
+          <span className="text-sm text-gray-500">3 teratas</span>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          {upcomingTop3.map((j) => (
+            <Card key={j.id} className="p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="truncate font-semibold text-gray-900">{j.kegiatan}</div>
+                  <div className="mt-1 text-sm text-gray-600">{formatTanggalID(j.tanggal)}</div>
+                </div>
+                <Badge>{j.dusun.nama}</Badge>
+              </div>
+
+              <div className="mt-3 space-y-1 text-sm text-gray-700">
+                {j.jam_mulai ? (
+                  <div>
+                    <span className="text-gray-500">Jam:</span> {j.jam_mulai}
+                    {j.jam_selesai ? ` - ${j.jam_selesai}` : ""}
+                  </div>
+                ) : null}
+
+                {j.lokasi ? (
+                  <div>
+                    <span className="text-gray-500">Lokasi:</span> {j.lokasi}
+                  </div>
+                ) : null}
+
+                {j.catatan ? <div className="text-gray-600">{j.catatan}</div> : null}
+              </div>
+            </Card>
+          ))}
+
+          {upcomingTop3.length === 0 && (
+            <Card className="p-6 md:col-span-3">
+              <div className="font-semibold text-gray-900">Belum ada jadwal.</div>
+              <div className="mt-1 text-sm text-gray-600">
+                Coba pilih dusun lain atau kosongkan pencarian.
+              </div>
+            </Card>
+          )}
+        </div>
+      </div>
+
+      {/* KADER */}
+      <div className="space-y-3">
+        <h2 className="text-lg font-semibold text-gray-900">Kontak Kader</h2>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          {kaderFiltered.map((k) => (
+            <Card key={k.id} className="p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="font-semibold text-gray-900">{k.nama}</div>
+                  <div className="mt-1 text-sm text-gray-600">{k.dusun.nama}</div>
+                </div>
+                <Badge>{k.dusun.nama}</Badge>
+              </div>
+
+              <div className="mt-4">
+                <a
+                  href={toWaLink(k.no_wa, "Halo, saya ingin tanya informasi kesehatan Desa Ngipak.")}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <Button className="w-full">Chat WhatsApp</Button>
+                </a>
+              </div>
+            </Card>
+          ))}
+
+          {kaderFiltered.length === 0 && (
+            <Card className="p-6 md:col-span-3">
+              <div className="font-semibold text-gray-900">Kontak kader belum tersedia.</div>
+              <div className="mt-1 text-sm text-gray-600">Tambahkan data kader untuk dusun ini.</div>
+            </Card>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
