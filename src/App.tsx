@@ -15,10 +15,10 @@ export default function App() {
 
         <Route path="/produk" element={<ProdukPage />} />
 
-        {/* Detail UMKM */}
+        {/* FINAL FLOW: detail UMKM */}
         <Route path="/umkm/:id" element={<ProdukDetailPage />} />
 
-        {/* Legacy route (biar user ga nyasar) */}
+        {/* legacy: dulu product detail, sekarang diarahkan balik */}
         <Route path="/produk/:id" element={<Navigate to="/produk" replace />} />
 
         <Route path="/kesehatan" element={<KesehatanPage />} />

@@ -322,7 +322,6 @@ export default function KesehatanPage() {
   const stuntingSeries = last6.map((x) => x.stunting);
   const hipertensiSeries = last6.map((x) => x.hipertensi);
   const latest = STATISTIK[STATISTIK.length - 1];
-  const prev = STATISTIK[STATISTIK.length - 2] ?? latest;
 
   return (
     <div className="space-y-6">
@@ -342,7 +341,7 @@ export default function KesehatanPage() {
               dokumen edukasi.
             </p>
             <p className="mt-3 text-xs text-white/70">
-              Periode: {META_KESEHATAN.periode} • Sumber:{" "}
+              Periode: {META_KESEHATAN.periode_terakhir} • Sumber:{" "}
               {META_KESEHATAN.sumber}
             </p>
           </div>
